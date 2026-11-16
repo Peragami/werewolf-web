@@ -311,7 +311,6 @@ button.selected {
   align-items: start;
 }
 #screen-lobby .card, #screen-result .card { margin-bottom: 0; }
-#screen-lobby > .card:first-child { grid-row: span 2; } /* 設定カードの右にガイドとチャットを積む */
 
 #screen-game {
   display: grid;
@@ -330,26 +329,7 @@ button.selected {
   #myRoleCard, #phasePanel { grid-column: auto; }
 }
 
-/* ---------- 役職一覧・説明 ---------- */
-.role-guide summary {
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: 1px;
-  color: var(--gold);
-  list-style: none;
-}
-.role-guide summary::-webkit-details-marker { display: none; }
-.role-guide summary::after { content: " ▼"; font-size: 12px; }
-.role-guide[open ] summary::after { content: " ▲"; }
-.rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 12px; margin-top: 12px; }
-.rg-card {
-  background: linear-gradient(180deg, #201d18 0%, #171410 100%);
-  border: 1px solid #453d31;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 3px 8px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-}
+/* ---------- 役職カード共通部品（役職構成エディタ） ---------- */
 .rg-bar { height: 8px; }
 .rg-body { padding: 12px 14px 13px; }
 .rg-head { display: flex; align-items: center; gap: 11px; }

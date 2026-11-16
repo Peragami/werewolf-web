@@ -1281,7 +1281,7 @@ $("nightSel").addEventListener("change", async (e) => {
   try { await fb(subPath(roomCode, "/config/nightSec.json"), "PUT", parseInt(e.target.value, 10)); } catch (err) {}
 });
 
-/* ---------------- 役職一覧・説明（キャラカード風） ---------------- */
+/* ---------------- 役職カード表示用メタ（役職構成エディタ） ---------------- */
 const RG_META = {
   villager:    { color: "#8ecae6", tag: "能力なし" },
   seer:        { color: "#6ee7a0", tag: "占い" },
@@ -1301,33 +1301,10 @@ const RG_META = {
   hinmin:      { color: "#d4a373", tag: "人狼キル" },
   executioner: { color: "#94a3b8", tag: "処刑" },
 };
-const RG_ORDER = ["villager", "seer", "medium", "knight", "heavyknight", "sister", "president",
-  "wolf", "wolf2", "madman", "fanatic", "fox", "urameshia", "aho", "nottori", "hinmin", "executioner"];
 const TEAM_LABEL = { villager: "村人陣営", wolf: "人狼陣営", fox: "第三陣営", special: "特殊陣営" };
-
-function roleGuideHtml() {
-  return '<div class="rg-grid">' + RG_ORDER.map((k) => {
-    const r = ROLES[k];
-    const m = RG_META[k];
-    return '<div class="rg-card">' +
-      '<div class="rg-bar" style="background:' + m.color + '"></div>' +
-      '<div class="rg-body">' +
-        '<div class="rg-head">' +
-          '<span class="rg-avatar" style="border-color:' + m.color + '">' + r.icon + "</span>" +
-          '<div><div class="rg-name">' + r.name + '</div>' +
-          '<div class="rg-teamlabel">' + TEAM_LABEL[r.team] + "</div></div>" +
-        "</div>" +
-        '<span class="rg-chip">#' + m.tag + "</span>" +
-        '<p class="rg-desc">' + r.desc + "</p>" +
-      "</div></div>";
-  }).join("") + "</div>";
-}
 
 /* ---------------- 再入室 ---------------- */
 (function init() {
-  const guide = roleGuideHtml();
-  if ($("roleGuideHome")) $("roleGuideHome").innerHTML = guide;
-  if ($("roleGuideLobby")) $("roleGuideLobby").innerHTML = guide;
   const saved = localStorage.getItem("wolf_room");
   if (saved) enterRoom(saved);
 })();
