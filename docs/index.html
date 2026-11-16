@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>役職もりもり人狼 | オンライン人狼</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🌕 役職もりもり人狼</h1>
+  <div id="roomInfo" class="room-info hidden">
+    ルーム <span id="roomCodeLabel" class="code"></span>
+    <span id="phaseLabel"></span>
+    <span id="timerLabel"></span>
+  </div>
+</header>
+
+<main>
+  <!-- HOME -->
+  <section id="screen-home" class="screen">
+    <div class="card">
+      <label for="nameInput">あなたの名前</label>
+      <input id="nameInput" type="text" maxlength="12" placeholder="名前を入力">
+      <button id="createBtn" class="primary">ルームを作る</button>
+      <div class="join-row">
+        <input id="joinCodeInput" type="text" maxlength="6" placeholder="ルームコード（6文字）">
+        <button id="joinBtn">参加する</button>
+      </div>
+      <p id="homeError" class="error"></p>
+      <p class="note">友達とルームコードで集まって遊ぶオンライン人狼です。役職は各プレイヤーの端末にだけ表示されます。議論は対面や通話アプリでどうぞ。不足人数はBotで補充できます。</p>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="screen-lobby" class="screen hidden">
+    <div class="card">
+      <h2>ロビー <span id="lobbyCode" class="code"></span></h2>
+      <p class="note">このコードを友達に伝えてください。全員そろったらホストが開始します。</p>
+      <h3>参加者 <span id="memberCount"></span></h3>
+      <ul id="memberList" class="member-list"></ul>
+      <div id="hostConfig" class="config hidden">
+        <h3>ゲーム設定（ホスト）</h3>
+        <label>目標人数
+          <select id="targetSel"></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="botFillChk" checked> 不足分をBotで補充する</label>
+        <label>議論時間
+          <select id="discussSel">
+            <option value="120">2分</option>
+            <option value="180" selected>3分</option>
+            <option value="300">5分</option>
+            <option value="600">10分</option>
+          </select>
+        </label>
+        <label>夜の制限時間
+          <select id="nightSel">
+            <option value="60">60秒</option>
+            <option value="90" selected>90秒</option>
+            <option value="120">120秒</option>
+          </select>
+        </label>
+        <h4>役職構成（村人は残りで自動調整）</h4>
+        <div id="compEditor"></div>
+        <p id="compSummary" class="note"></p>
+        <p id="startError" class="error"></p>
+        <button id="startBtn" class="primary">ゲーム開始（役職を配る）</button>
+      </div>
+      <p id="lobbyWait" class="note hidden">ホストの開始を待っています…</p>
+      <button id="leaveLobbyBtn" class="danger">ロビーを出る</button>
+    </div>
+    <div class="card">
+      <h3>チャット</h3>
+      <div id="lobbyChatLog" class="chat-log"></div>
+      <div class="chat-row">
+        <input id="lobbyChatInput" type="text" maxlength="200" placeholder="メッセージ">
+        <button id="lobbyChatSend">送信</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen hidden">
+    <div id="myRoleCard" class="card role-card"></div>
+    <div id="phasePanel" class="card"></div>
+    <div class="card">
+      <h3>プレイヤー</h3>
+      <div id="playerGrid" class="player-grid"></div>
+    </div>
+    <div class="card">
+      <h3>チャット</h3>
+      <div id="chatLog" class="chat-log"></div>
+      <div class="chat-row">
+        <input id="chatInput" type="text" maxlength="200" placeholder="メッセージ">
+        <button id="chatSend">送信</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>経過ログ</h3>
+      <div id="eventLog" class="event-log"></div>
+    </div>
+    <button id="leaveGameBtn" class="danger">退出する（観戦扱いになります）</button>
+  </section>
+
+  <!-- RESULT -->
+  <section id="screen-result" class="screen hidden">
+    <div class="card">
+      <h2 id="winnerBanner"></h2>
+      <p id="winReason"></p>
+      <h3>役職公開</h3>
+      <div id="revealList"></div>
+      <button id="rematchBtn" class="primary hidden">ロビーに戻って再戦（ホスト）</button>
+      <p id="rematchWait" class="note hidden">ホストが再戦を準備しています…</p>
+      <button id="leaveResultBtn" class="danger">トップに戻る</button>
+    </div>
+    <div class="card">
+      <h3>経過ログ</h3>
+      <div id="resultLog" class="event-log"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p class="note">役職もりもり人狼 Web版（Firebase同期・ルームコード方式）</p>
+</footer>
+
+<script src="game.js"></script>
+</body>
+</html>
