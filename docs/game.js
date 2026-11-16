@@ -741,18 +741,33 @@ function hostTick() {
   if (st === "reveal" && now >= room.phaseEndsAt) job = () => hostStartNight();
   else if (st === "night") {
     hostBotsNight();
-    if (nightComplete() || now >= room.phaseEndsAt) job = () => resolveNight();
+    // 夜の開始から8秒は全員揃っても確定しない（第二人狼の2人目選択など、人間の複数選択の猶予）。
+    // 全員の行動が終わったら、残り時間を10秒まで短縮してから夜が明ける。
+    const nightStartedAt = room.phaseEndsAt - (room.config.nightSec || 90) * 1000;
+    const nightGraceOk = now - nightStartedAt >= 8000;
+    if (now >= room.phaseEndsAt) job = () => resolveNight();
+    else if (nightComplete() && nightGraceOk) job = () => capPhaseEnd(now);
   } else if (st === "dawn" && now >= room.phaseEndsAt) job = () => advanceToDay();
   else if (st === "day") {
     hostBotsDaySkip();
-    if (dayComplete() || now >= room.phaseEndsAt) job = () => advanceToVote();
+    if (now >= room.phaseEndsAt) job = () => advanceToVote();
+    else if (dayComplete()) job = () => capPhaseEnd(now);
   } else if (st === "vote") {
     hostBotsVote();
-    if (voteComplete() || now >= room.phaseEndsAt) job = () => resolveVote();
+    if (now >= room.phaseEndsAt) job = () => resolveVote();
+    else if (voteComplete()) job = () => capPhaseEnd(now);
   } else if (st === "exile" && now >= room.phaseEndsAt) job = () => afterExile();
   if (!job) return;
   hostBusy = true;
   job().catch(() => {}).finally(() => { hostBusy = false; });
+}
+
+/* 全員の行動が終わったフェイズは、残り時間を10秒まで短縮する（10秒未満なら何もしない＝延ばさない） */
+async function capPhaseEnd(now) {
+  if (!room || room.phaseEndsAt - now <= 10000) return;
+  const newEnd = now + 10000;
+  room.phaseEndsAt = newEnd;
+  await hostPatch({ phaseEndsAt: newEnd });
 }
 
 function heavyOnCooldown(pid) {
