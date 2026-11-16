@@ -355,3 +355,6 @@ button.selected {
   border-radius: 999px;
 }
 .rg-desc { color: var(--sub); font-size: 13px; line-height: 1.65; margin: 8px 0 1px; }
+
+.preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset-row button { flex: 1; min-width: 200px; margin-top: 6px; }

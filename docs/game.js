@@ -42,6 +42,18 @@ const COMP_TABLE = {
   11: { wolf: 2, seer: 1, medium: 1, knight: 1, heavyknight: 1, madman: 1, fox: 1 },
   12: { wolf: 3, seer: 1, medium: 1, knight: 1, heavyknight: 1, sister: 1, madman: 1, fox: 1 },
 };
+/* バラエティー構成：面白い役職（特殊陣営・新役職）を多めにした割り振り */
+const COMP_VARIETY = {
+  5:  { wolf: 1, seer: 1, executioner: 1, urameshia: 1 },
+  6:  { wolf: 1, seer: 1, heavyknight: 1, executioner: 1, nottori: 1 },
+  7:  { wolf: 2, seer: 1, heavyknight: 1, executioner: 1, urameshia: 1 },
+  8:  { wolf: 1, wolf2: 1, seer: 1, medium: 1, sister: 1, president: 1, executioner: 1, urameshia: 1 },
+  9:  { wolf: 2, seer: 1, medium: 1, heavyknight: 1, sister: 1, fanatic: 1, fox: 1, hinmin: 1 },
+  10: { wolf: 2, wolf2: 1, seer: 1, medium: 1, heavyknight: 1, sister: 1, fox: 1, urameshia: 1, executioner: 1 },
+  11: { wolf: 2, wolf2: 1, seer: 1, medium: 1, heavyknight: 1, sister: 1, president: 1, fanatic: 1, fox: 1, nottori: 1 },
+  12: { wolf: 2, wolf2: 1, seer: 1, medium: 1, heavyknight: 1, sister: 1, president: 1, fanatic: 1, fox: 1, aho: 1, executioner: 1 },
+};
+const COMP_PRESETS = { normal: COMP_TABLE, variety: COMP_VARIETY };
 const BOT_NAMES = ["ボブ", "アリス", "ケン", "ミサキ", "ゴロウ", "ユイ", "タロウ", "ハナ", "ジン", "リン", "ソラ", "カイ"];
 
 const isWolfRole = (r) => r === "wolf" || r === "wolf2";
@@ -1255,16 +1267,18 @@ $("leaveGameBtn").addEventListener("click", () => leaveRoom(false));
 $("leaveResultBtn").addEventListener("click", () => leaveRoom(false));
 $("rematchBtn").addEventListener("click", () => { if (isHost()) hostRematch(); });
 $("startBtn").addEventListener("click", () => { if (isHost()) hostStartGame(); });
-$("recommendCompBtn").addEventListener("click", async () => {
+async function applyCompPreset(kind) {
   if (!isHost() || !room) return;
-  const comp = { ...COMP_TABLE[room.config.target] };
+  const comp = { ...COMP_PRESETS[kind][room.config.target] };
   try {
     await fb(subPath(roomCode, "/config/comp.json"), "PUT", comp);
     room.config.comp = comp;
     lobbySig = "";
     renderCompEditor();
   } catch (e) { /* 通信失敗時はpollで戻る */ }
-});
+}
+$("recommendNormalBtn").addEventListener("click", () => applyCompPreset("normal"));
+$("recommendVarietyBtn").addEventListener("click", () => applyCompPreset("variety"));
 $("lobbyChatSend").addEventListener("click", () => sendChat("lobbyChatInput"));
 $("chatSend").addEventListener("click", () => sendChat("chatInput"));
 $("lobbyChatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat("lobbyChatInput"); });
