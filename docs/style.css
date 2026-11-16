@@ -303,6 +303,7 @@ button.selected {
   align-items: start;
 }
 #screen-lobby .card, #screen-result .card { margin-bottom: 0; }
+#screen-lobby > .card:first-child { grid-row: span 2; } /* 設定カードの右にガイドとチャットを積む */
 
 #screen-game {
   display: grid;
@@ -320,3 +321,32 @@ button.selected {
   #screen-lobby, #screen-result, #screen-game { grid-template-columns: 1fr; }
   #myRoleCard, #phasePanel { grid-column: auto; }
 }
+
+/* ---------- 役職一覧・説明 ---------- */
+.role-guide summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: var(--gold);
+  list-style: none;
+}
+.role-guide summary::-webkit-details-marker { display: none; }
+.role-guide summary::after { content: " ▼"; font-size: 12px; }
+.role-guide[open ] summary::after { content: " ▲"; }
+.rg-team {
+  margin: 14px 0 6px;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 1px;
+  border-left: 5px solid var(--gold);
+  padding: 3px 8px;
+  background: linear-gradient(90deg, #2a3358 0%, rgba(42,51,88,0) 85%);
+  border-radius: 4px;
+}
+.rg-team.wolf { border-left-color: var(--wolf); }
+.rg-team.fox { border-left-color: var(--fox); }
+.rg-team.special { border-left-color: var(--special); }
+.rg-item { padding: 7px 2px; border-bottom: 1px dashed #2e3552; }
+.rg-item .rg-name { font-weight: 800; font-size: 15px; }
+.rg-item .rg-desc { color: var(--sub); font-size: 13px; line-height: 1.6; margin-top: 2px; }

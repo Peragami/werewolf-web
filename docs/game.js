@@ -1270,8 +1270,29 @@ $("nightSel").addEventListener("change", async (e) => {
   try { await fb(subPath(roomCode, "/config/nightSec.json"), "PUT", parseInt(e.target.value, 10)); } catch (err) {}
 });
 
+/* ---------------- 役職一覧・説明 ---------------- */
+function roleGuideHtml() {
+  const groups = [
+    { team: "villager", label: "村人陣営", keys: ["villager", "seer", "medium", "knight", "heavyknight", "sister", "president"] },
+    { team: "wolf", label: "人狼陣営", keys: ["wolf", "wolf2", "madman", "fanatic"] },
+    { team: "fox", label: "第三陣営", keys: ["fox"] },
+    { team: "special", label: "特殊陣営", keys: ["urameshia", "aho", "nottori", "hinmin", "executioner"] },
+  ];
+  return groups.map((g) =>
+    '<div class="rg-team ' + g.team + '">' + g.label + "</div>" +
+    g.keys.map((k) => {
+      const r = ROLES[k];
+      return '<div class="rg-item"><span class="rg-name">' + r.icon + " " + r.name + '</span>' +
+        '<div class="rg-desc">' + r.desc + "</div></div>";
+    }).join("")
+  ).join("");
+}
+
 /* ---------------- 再入室 ---------------- */
 (function init() {
+  const guide = roleGuideHtml();
+  if ($("roleGuideHome")) $("roleGuideHome").innerHTML = guide;
+  if ($("roleGuideLobby")) $("roleGuideLobby").innerHTML = guide;
   const saved = localStorage.getItem("wolf_room");
   if (saved) enterRoom(saved);
 })();
