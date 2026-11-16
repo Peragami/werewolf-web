@@ -334,19 +334,36 @@ button.selected {
 .role-guide summary::-webkit-details-marker { display: none; }
 .role-guide summary::after { content: " ▼"; font-size: 12px; }
 .role-guide[open ] summary::after { content: " ▲"; }
-.rg-team {
-  margin: 14px 0 6px;
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 1px;
-  border-left: 5px solid var(--gold);
-  padding: 3px 8px;
-  background: linear-gradient(90deg, #2a3358 0%, rgba(42,51,88,0) 85%);
-  border-radius: 4px;
+.rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 12px; margin-top: 12px; }
+.rg-card {
+  background: linear-gradient(180deg, #201d18 0%, #171410 100%);
+  border: 1px solid #453d31;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
 }
-.rg-team.wolf { border-left-color: var(--wolf); }
-.rg-team.fox { border-left-color: var(--fox); }
-.rg-team.special { border-left-color: var(--special); }
-.rg-item { padding: 7px 2px; border-bottom: 1px dashed #2e3552; }
-.rg-item .rg-name { font-weight: 800; font-size: 15px; }
-.rg-item .rg-desc { color: var(--sub); font-size: 13px; line-height: 1.6; margin-top: 2px; }
+.rg-bar { height: 8px; }
+.rg-body { padding: 12px 14px 13px; }
+.rg-head { display: flex; align-items: center; gap: 11px; }
+.rg-avatar {
+  width: 52px; height: 52px; flex: none;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  background: radial-gradient(circle at 35% 30%, #3a3428, #14110c);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 27px;
+  box-shadow: 0 2px 5px rgba(0,0,0,.5);
+}
+.rg-name { font-weight: 800; font-size: 17px; letter-spacing: .5px; }
+.rg-teamlabel { color: var(--sub); font-size: 12px; margin-top: 1px; }
+.rg-chip {
+  display: inline-block;
+  margin-top: 9px;
+  background: #100e0a;
+  border: 1px solid #453d31;
+  color: #cfc4ae;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.rg-desc { color: var(--sub); font-size: 13px; line-height: 1.65; margin: 8px 0 1px; }

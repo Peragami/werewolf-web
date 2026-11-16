@@ -1270,22 +1270,46 @@ $("nightSel").addEventListener("change", async (e) => {
   try { await fb(subPath(roomCode, "/config/nightSec.json"), "PUT", parseInt(e.target.value, 10)); } catch (err) {}
 });
 
-/* ---------------- 役職一覧・説明 ---------------- */
+/* ---------------- 役職一覧・説明（キャラカード風） ---------------- */
+const RG_META = {
+  villager:    { color: "#8ecae6", tag: "能力なし" },
+  seer:        { color: "#6ee7a0", tag: "占い" },
+  medium:      { color: "#c4b5fd", tag: "霊媒" },
+  knight:      { color: "#5b8cff", tag: "護衛" },
+  heavyknight: { color: "#2dd4bf", tag: "2人護衛" },
+  sister:      { color: "#ffd166", tag: "全体防御" },
+  president:   { color: "#f5c542", tag: "投票3倍" },
+  wolf:        { color: "#e5484d", tag: "襲撃" },
+  wolf2:       { color: "#ff7a59", tag: "2人襲撃" },
+  madman:      { color: "#e93d82", tag: "人狼側" },
+  fanatic:     { color: "#f76b15", tag: "人狼が分かる" },
+  fox:         { color: "#ffb703", tag: "単独勝利" },
+  urameshia:   { color: "#9d6bff", tag: "能力コピー" },
+  aho:         { color: "#f472b6", tag: "バレたら死" },
+  nottori:     { color: "#a78bfa", tag: "人狼化" },
+  hinmin:      { color: "#d4a373", tag: "人狼キル" },
+  executioner: { color: "#94a3b8", tag: "処刑" },
+};
+const RG_ORDER = ["villager", "seer", "medium", "knight", "heavyknight", "sister", "president",
+  "wolf", "wolf2", "madman", "fanatic", "fox", "urameshia", "aho", "nottori", "hinmin", "executioner"];
+const TEAM_LABEL = { villager: "村人陣営", wolf: "人狼陣営", fox: "第三陣営", special: "特殊陣営" };
+
 function roleGuideHtml() {
-  const groups = [
-    { team: "villager", label: "村人陣営", keys: ["villager", "seer", "medium", "knight", "heavyknight", "sister", "president"] },
-    { team: "wolf", label: "人狼陣営", keys: ["wolf", "wolf2", "madman", "fanatic"] },
-    { team: "fox", label: "第三陣営", keys: ["fox"] },
-    { team: "special", label: "特殊陣営", keys: ["urameshia", "aho", "nottori", "hinmin", "executioner"] },
-  ];
-  return groups.map((g) =>
-    '<div class="rg-team ' + g.team + '">' + g.label + "</div>" +
-    g.keys.map((k) => {
-      const r = ROLES[k];
-      return '<div class="rg-item"><span class="rg-name">' + r.icon + " " + r.name + '</span>' +
-        '<div class="rg-desc">' + r.desc + "</div></div>";
-    }).join("")
-  ).join("");
+  return '<div class="rg-grid">' + RG_ORDER.map((k) => {
+    const r = ROLES[k];
+    const m = RG_META[k];
+    return '<div class="rg-card">' +
+      '<div class="rg-bar" style="background:' + m.color + '"></div>' +
+      '<div class="rg-body">' +
+        '<div class="rg-head">' +
+          '<span class="rg-avatar" style="border-color:' + m.color + '">' + r.icon + "</span>" +
+          '<div><div class="rg-name">' + r.name + '</div>' +
+          '<div class="rg-teamlabel">' + TEAM_LABEL[r.team] + "</div></div>" +
+        "</div>" +
+        '<span class="rg-chip">#' + m.tag + "</span>" +
+        '<p class="rg-desc">' + r.desc + "</p>" +
+      "</div></div>";
+  }).join("") + "</div>";
 }
 
 /* ---------------- 再入室 ---------------- */
