@@ -321,10 +321,21 @@ function renderCompEditor() {
   const cfg = room.config;
   $("compEditor").innerHTML = ROLE_KEYS.map((k) => {
     const r = ROLES[k];
-    return '<div class="comp-row"><span class="nm">' + r.icon + " " + r.name + '</span>' +
-      '<span class="ctl"><button data-comp="' + k + '" data-d="-1">−</button>' +
-      '<span class="num">' + (cfg.comp[k] || 0) + "</span>" +
-      '<button data-comp="' + k + '" data-d="1">＋</button></span></div>';
+    const m = RG_META[k];
+    return '<div class="comp-card">' +
+      '<div class="rg-bar" style="background:' + m.color + '"></div>' +
+      '<div class="rg-body">' +
+        '<div class="rg-head">' +
+          '<span class="rg-avatar sm" style="border-color:' + m.color + '">' + r.icon + "</span>" +
+          '<div><div class="rg-name">' + r.name + '</div>' +
+          '<div class="rg-teamlabel">' + TEAM_LABEL[r.team] + "</div></div>" +
+          '<span class="comp-ctl"><button data-comp="' + k + '" data-d="-1">−</button>' +
+          '<span class="num">' + (cfg.comp[k] || 0) + "</span>" +
+          '<button data-comp="' + k + '" data-d="1">＋</button></span>' +
+        "</div>" +
+        '<span class="rg-chip">#' + m.tag + "</span>" +
+        '<p class="rg-desc">' + r.desc + "</p>" +
+      "</div></div>";
   }).join("");
   const v = compVillagers();
   $("compSummary").textContent =

@@ -204,11 +204,19 @@ button.selected {
 .tag { font-size: 11px; color: var(--sub); border: 1px solid #39406b; padding: 1px 6px; border-radius: 999px; }
 .tag.host { color: var(--gold); border-color: var(--gold); }
 
-.comp-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #2e3552; }
-.comp-row .nm { font-size: 15px; }
-.comp-row .ctl { display: flex; align-items: center; gap: 8px; }
-.comp-row .ctl button { margin: 0; padding: 3px 13px; font-size: 16px; }
-.comp-row .num { min-width: 24px; text-align: center; font-weight: 800; color: var(--gold); }
+/* ---------- 役職構成エディタ（キャラカード＋人数ステッパー） ---------- */
+#compEditor { display: grid; grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); gap: 10px; }
+.comp-card {
+  background: linear-gradient(180deg, #201d18 0%, #171410 100%);
+  border: 1px solid #453d31;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.comp-ctl { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.comp-ctl button { margin: 0; padding: 3px 12px; font-size: 16px; }
+.comp-ctl .num { min-width: 22px; text-align: center; font-weight: 800; color: var(--gold); font-size: 16px; }
+.rg-avatar.sm { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
 
 /* ---------- 役職カード（アイテムカード風） ---------- */
 .role-card { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--ink), 0 0 18px rgba(245,197,66,.28); }
