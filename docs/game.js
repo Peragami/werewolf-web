@@ -15,7 +15,7 @@ const ROLES = {
   madman:   { name: "狂人",   team: "wolf",     icon: "🃏", desc: "人狼側の人間。占いでは「人間」と出る。人狼が勝てば一緒に勝利。" },
   seer:     { name: "占い師", team: "villager", icon: "🔮", desc: "毎夜1人を占い、人狼かどうか分かる。妖狐を占うと呪殺してしまう。" },
   medium:   { name: "霊媒師", team: "villager", icon: "🕯️", desc: "前日の昼に追放された人が人狼だったかどうか、夜に分かる。" },
-  knight:   { name: "騎士",   team: "villager", icon: "🛡️", desc: "毎夜1人を護衛して襲撃から守る。自分は守れない。同じ人は2夜連続で守れない。" },
+  knight:   { name: "騎士",   team: "villager", icon: "🛡️", desc: "毎夜1人を護衛して襲撃から守る。自分は守れない。同じ人を続けて守ることもできる。" },
   fox:      { name: "妖狐",   team: "fox",      icon: "🦊", desc: "第三陣営。襲撃では死なないが、占われると呪殺される。ゲーム終了時に生き残っていれば単独勝利。" },
   villager: { name: "村人",   team: "villager", icon: "🧑‍🌾", desc: "特殊な能力はない。議論と投票で人狼を見つけ出す。" },
 };
@@ -409,10 +409,9 @@ function renderPhasePanel() {
       html += '<p class="phase-desc">占う相手を1人選んでください。結果は朝に分かります。</p>' +
         targetButtons(targets, myAct ? myAct.target : null, "night-target");
     } else if (my.role === "knight") {
-      const lastGuard = (room.knightGuard || {})[myPid];
-      const targets = aliveArr().filter((p) => p.pid !== myPid && p.pid !== lastGuard);
+      const targets = aliveArr().filter((p) => p.pid !== myPid);
       const myAct = actions[myPid];
-      html += '<p class="phase-desc">護衛する相手を1人選んでください' + (lastGuard ? "（前夜守った人は選べません）" : "") + "。</p>" +
+      html += '<p class="phase-desc">護衛する相手を1人選んでください（前夜と同じ人でもOK）。</p>' +
         targetButtons(targets, myAct ? myAct.target : null, "night-target");
     } else {
       html += '<p class="phase-desc">あなたの役職に夜の行動はありません。そのままお待ちください。</p>';
@@ -864,10 +863,6 @@ function hostBotsNight() {
     const type = p.role === "wolf" ? "attack" : p.role === "seer" ? "divine" : "guard";
     let cands = aliveArr().filter((t) => t.pid !== p.pid);
     if (p.role === "wolf") cands = cands.filter((t) => t.role !== "wolf");
-    if (p.role === "knight") {
-      const lg = (room.knightGuard || {})[p.pid];
-      cands = cands.filter((t) => t.pid !== lg);
-    }
     if (p.role === "seer") {
       const done = ((room.seerHistory || {})[p.pid] || []).map((h) => h.target);
       const fresh = cands.filter((t) => !done.includes(t.pid));
