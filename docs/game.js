@@ -287,7 +287,7 @@ function renderLobby() {
   const arr = playersArr();
   $("memberCount").textContent = "（" + arr.length + "人）";
   $("memberList").innerHTML = arr.map((p) =>
-    "<li><span>" + esc(p.name) + (p.pid === myPid ? "（あなた）" : "") + "</span>" +
+    "<li><span>" + '<span class="avatar-sm">' + (p.bot ? "🤖" : "🧑") + "</span>" + esc(p.name) + (p.pid === myPid ? "（あなた）" : "") + "</span>" +
     "<span>" + (room.host === p.pid ? '<span class="tag host">ホスト</span>' : "") +
     (p.bot ? '<span class="tag">Bot</span>' : "") + "</span></li>"
   ).join("");
@@ -411,8 +411,10 @@ function renderGame() {
     if (p.pid === room.host) st += "・ホスト";
     if (p.bot) st += "・Bot";
     const roleMark = iKnowWolves && isWolfRole(p.role) ? ' <span class="tag">🐺人狼</span>' : "";
+    const avatar = p.alive ? (p.bot ? "🤖" : "🧑") : "💀";
     return '<div class="player-cell' + (p.alive ? "" : " dead") + (p.pid === myPid ? " me" : "") + '">' +
-      "<div>" + esc(p.name) + (p.pid === myPid ? "（あなた）" : "") + roleMark + "</div>" +
+      '<div class="pc-head"><span class="avatar">' + avatar + '</span><span class="pc-name">' +
+      esc(p.name) + (p.pid === myPid ? "（あなた）" : "") + roleMark + "</span></div>" +
       '<div class="st">' + st + "</div></div>";
   }).join("");
 
@@ -664,7 +666,8 @@ function renderResult() {
   $("revealList").innerHTML = playersArr().map((p) => {
     const r = p.role ? ROLES[p.role] : null;
     return '<div class="player-cell' + (p.alive ? "" : " dead") + '">' +
-      "<div>" + (r ? r.icon + " " : "") + esc(p.name) + (p.bot ? "（Bot）" : "") + "</div>" +
+      '<div class="pc-head"><span class="avatar">' + (r ? r.icon : "❔") + '</span><span class="pc-name">' +
+      esc(p.name) + (p.bot ? "（Bot）" : "") + "</span></div>" +
       '<div class="st">' + (r ? r.name : "役職なし") + "・" + (p.alive ? "生存" : "死亡") + "</div></div>";
   }).join("");
   $("rematchBtn").classList.toggle("hidden", !isHost());
