@@ -39,8 +39,8 @@ const COMP_TABLE = {
   8:  { wolf: 2, seer: 1, medium: 1, knight: 1 },
   9:  { wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1 },
   10: { wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, fox: 1 },
-  11: { wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, fox: 1 },
-  12: { wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, fox: 1 },
+  11: { wolf: 2, seer: 1, medium: 1, knight: 1, heavyknight: 1, madman: 1, fox: 1 },
+  12: { wolf: 3, seer: 1, medium: 1, knight: 1, heavyknight: 1, sister: 1, madman: 1, fox: 1 },
 };
 const BOT_NAMES = ["ボブ", "アリス", "ケン", "ミサキ", "ゴロウ", "ユイ", "タロウ", "ハナ", "ジン", "リン", "ソラ", "カイ"];
 
@@ -1255,6 +1255,16 @@ $("leaveGameBtn").addEventListener("click", () => leaveRoom(false));
 $("leaveResultBtn").addEventListener("click", () => leaveRoom(false));
 $("rematchBtn").addEventListener("click", () => { if (isHost()) hostRematch(); });
 $("startBtn").addEventListener("click", () => { if (isHost()) hostStartGame(); });
+$("recommendCompBtn").addEventListener("click", async () => {
+  if (!isHost() || !room) return;
+  const comp = { ...COMP_TABLE[room.config.target] };
+  try {
+    await fb(subPath(roomCode, "/config/comp.json"), "PUT", comp);
+    room.config.comp = comp;
+    lobbySig = "";
+    renderCompEditor();
+  } catch (e) { /* 通信失敗時はpollで戻る */ }
+});
 $("lobbyChatSend").addEventListener("click", () => sendChat("lobbyChatInput"));
 $("chatSend").addEventListener("click", () => sendChat("chatInput"));
 $("lobbyChatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat("lobbyChatInput"); });
