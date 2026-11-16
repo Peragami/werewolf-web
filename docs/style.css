@@ -42,7 +42,7 @@ body {
 /* ---------- ヘッダー（ロゴ＋HUD） ---------- */
 header {
   padding: 18px 16px 2px;
-  max-width: 820px;
+  max-width: min(1720px, 98vw);
   margin: 0 auto;
   text-align: center;
 }
@@ -78,7 +78,7 @@ header h1 {
 
 /* ---------- ゲーム画面フレーム ---------- */
 main {
-  max-width: 820px;
+  max-width: min(1720px, 98vw);
   margin: 12px auto 0;
   padding: 16px 14px 22px;
   background: rgba(10, 13, 26, .88);
@@ -90,7 +90,7 @@ main {
     0 0 34px rgba(0, 0, 0, .75),
     inset 0 0 60px rgba(0, 0, 0, .45);
 }
-footer { max-width: 820px; margin: 0 auto; padding: 10px 14px 26px; text-align: center; }
+footer { max-width: min(1720px, 98vw); margin: 0 auto; padding: 10px 14px 26px; text-align: center; }
 
 .hidden { display: none !important; }
 
@@ -292,3 +292,31 @@ button.selected {
 
 .vote-status { font-size: 13px; color: var(--sub); margin-top: 8px; line-height: 1.8; }
 .big-announce { font-size: 18px; font-weight: 800; line-height: 1.7; text-shadow: 0 1px 3px #000; }
+
+/* ---------- ワイドレイアウト（画面全体に広げてスクロールを減らす） ---------- */
+#screen-home .card { max-width: 640px; margin-left: auto; margin-right: auto; }
+
+#screen-lobby, #screen-result {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 14px;
+  align-items: start;
+}
+#screen-lobby .card, #screen-result .card { margin-bottom: 0; }
+
+#screen-game {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+#screen-game .card { margin-bottom: 0; }
+#myRoleCard { grid-column: 1; }
+#phasePanel { grid-column: 2; }
+#screen-game > .card:nth-child(3) { grid-column: 1 / -1; } /* プレイヤー一覧は全幅 */
+#leaveGameBtn { grid-column: 1 / -1; justify-self: start; margin-top: 0; }
+
+@media (max-width: 900px) {
+  #screen-lobby, #screen-result, #screen-game { grid-template-columns: 1fr; }
+  #myRoleCard, #phasePanel { grid-column: auto; }
+}
