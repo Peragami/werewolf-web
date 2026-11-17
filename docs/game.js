@@ -417,6 +417,54 @@ function renderLobby() {
   }
 }
 
+/* ---------------- 構成バランスの目安 ----------------
+   人狼の実効パワーと村人側の実効パワー（人数＋情報・防御役職の補正）の比率から
+   5段階で目安を出す。第三陣営・特殊役職は勝敗をかく乱するので別枠で数える */
+function compBalance() {
+  const cfg = room.config;
+  const c = cfg.comp || {};
+  const n = (k) => c[k] || 0;
+  const wolves = n("wolf") + n("wolf2");
+  const wolfSupport = n("madman") + n("fanatic");
+  const third = n("fox") + n("urameshia") + n("aho") + n("nottori") + n("hinmin") + n("executioner");
+  const assigned = ROLE_KEYS.reduce((s, k) => s + n(k), 0);
+  const villagers = Math.max(0, cfg.target - assigned);
+  const villTeam = villagers + n("seer") + n("medium") + n("knight") + n("heavyknight") + n("sister") + n("president");
+  /* 人狼は連携と毎夜の襲撃があるぶん1人を重く数え、村人側は情報・防御役職に補正を付ける */
+  const wolfPower = wolves * 2.5 + wolfSupport * 0.6;
+  const villPower = villagers + n("seer") * 1.7 + n("medium") * 1.6 + n("knight") * 1.7 +
+    n("heavyknight") * 1.9 + n("sister") * 1.5 + n("president") * 1.4;
+  const ratio = wolfPower + villPower > 0 ? wolfPower / (wolfPower + villPower) : 0.5;
+  let level, label, cls;
+  if (wolves === 0) { level = -3; label = "人狼がいません"; cls = "v"; }
+  else if (ratio < 0.32) { level = -2; label = "村人陣営がかなり有利"; cls = "v"; }
+  else if (ratio < 0.39) { level = -1; label = "村人陣営がやや有利"; cls = "v"; }
+  else if (ratio < 0.49) { level = 0; label = "互角（バランス良好）"; cls = "even"; }
+  else if (ratio < 0.57) { level = 1; label = "人狼陣営がやや有利"; cls = "w"; }
+  else { level = 2; label = "人狼陣営がかなり有利"; cls = "w"; }
+  return { ratio, level, label, cls, wolves, wolfSupport, third, villagers, villTeam };
+}
+
+function renderCompBalance() {
+  const box = $("compBalance");
+  if (!box || !room) return;
+  const b = compBalance();
+  const pct = Math.max(2, Math.min(98, ((b.ratio - 0.15) / (0.70 - 0.15)) * 100));
+  let advice = "";
+  if (b.level === 2) advice = "整えるなら：人狼を減らすか、占い師・騎士を足すのがおすすめ。";
+  else if (b.level === 1) advice = "少し人狼寄り。情報役職を足すと互角に近づきます。";
+  else if (b.level === -2) advice = "整えるなら：人狼や狂人を足すか、情報役職を減らすのがおすすめ。";
+  else if (b.level === -1) advice = "少し村人寄り。人狼を1人足すと互角に近づきます。";
+  else if (b.level === 0) advice = "そのまま遊べるバランスです。";
+  if (b.third >= 3) advice += " 第三・特殊役職が多めで、荒れた展開になりやすい構成です。";
+  box.innerHTML =
+    '<div class="bal-label ' + b.cls + '">⚖️ バランス目安：' + b.label + "</div>" +
+    '<div class="bal-detail">人狼' + b.wolves + "人＋狂人系" + b.wolfSupport + "人 ／ 村人陣営" + b.villTeam + "人 ／ 第三・特殊" + b.third + "人" +
+      (advice ? "<br>" + advice : "") + "</div>" +
+    '<div class="balance-meter"><div class="balance-marker" style="left:' + pct.toFixed(0) + '%"></div></div>' +
+    '<div class="balance-scale"><span>村人有利</span><span>互角</span><span>人狼有利</span></div>';
+}
+
 let debugSig = "";
 function renderDebugPanel() {
   const panel = $("debugPanel");
@@ -512,6 +560,7 @@ function renderCompEditor() {
     "構成：" + ROLE_KEYS.map((k) => ROLES[k].name + (cfg.comp[k] || 0)).join("・") +
     "・村人" + v + "（合計" + cfg.target + "人）" +
     (v < 0 ? "　⚠ 役職が人数を超えています" : "");
+  renderCompBalance();
   $("compEditor").querySelectorAll("[data-comp]").forEach((b) => {
     b.addEventListener("click", async () => {
       const k = b.getAttribute("data-comp");

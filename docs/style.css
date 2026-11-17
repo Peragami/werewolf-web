@@ -300,6 +300,26 @@ button.selected {
 
 .vote-status { font-size: 13px; color: var(--sub); margin-top: 8px; line-height: 1.8; }
 
+/* ---------- 構成バランス目安 ---------- */
+.balance-box {
+  margin-top: 8px; padding: 10px 12px;
+  background: #12172b; border: 1px solid #39406b; border-radius: 10px;
+}
+.balance-box .bal-label { font-weight: 800; font-size: 15px; }
+.balance-box .bal-label.v { color: var(--blue); }
+.balance-box .bal-label.even { color: var(--gold); }
+.balance-box .bal-label.w { color: #ff6b5e; }
+.balance-box .bal-detail { font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.6; }
+.balance-meter {
+  position: relative; height: 10px; border-radius: 5px; margin-top: 8px;
+  background: linear-gradient(90deg, #3f7fbf 0%, #6b7396 50%, #bf4a3f 100%);
+}
+.balance-marker {
+  position: absolute; top: -4px; width: 4px; height: 18px; border-radius: 2px;
+  background: #fff; box-shadow: 0 0 4px rgba(0,0,0,.7); transform: translateX(-2px);
+}
+.balance-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-top: 3px; }
+
 /* ---------- 行動履歴（結果画面） ---------- */
 #screen-result > .card:nth-child(3) { grid-column: 1 / -1; }
 .action-log { max-height: 420px; }
