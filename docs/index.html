@@ -70,7 +70,17 @@
           <button id="recommendNormalBtn">✨ おすすめ構成（ノーマル）</button>
           <button id="recommendVarietyBtn">🎉 バラエティー構成（面白い役職多め）</button>
         </div>
+        <div class="comp-tabs">
+          <button type="button" data-comp-page="white">🤍 白陣営</button>
+          <button type="button" data-comp-page="black">🖤 黒陣営</button>
+          <button type="button" data-comp-page="third">🟣 第三陣営・特殊役職</button>
+        </div>
         <div id="compEditor"></div>
+        <div class="comp-pager">
+          <button type="button" id="compPrevBtn">◀ 前のページ</button>
+          <span id="compPageInfo" class="note"></span>
+          <button type="button" id="compNextBtn">次のページ ▶</button>
+        </div>
         <p id="compSummary" class="note"></p>
         <p id="startError" class="error"></p>
         <button id="startBtn" class="primary">ゲーム開始（役職を配る）</button>

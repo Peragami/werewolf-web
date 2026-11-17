@@ -358,3 +358,15 @@ button.selected {
 
 .preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-row button { flex: 1; min-width: 200px; margin-top: 6px; }
+
+/* ---------- 役職構成の3ページ切替 ---------- */
+.comp-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.comp-tabs button { flex: 1; min-width: 130px; margin: 0; opacity: .65; }
+.comp-tabs button.active {
+  opacity: 1; font-weight: 800; color: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(245,197,66,.35), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.comp-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.comp-pager button { margin: 0; }
+.comp-pager button:disabled { opacity: .35; }

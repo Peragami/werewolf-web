@@ -329,9 +329,38 @@ function compVillagers() {
   return cfg.target - used;
 }
 
+/* 役職構成の3ページ（白陣営／黒陣営／第三陣営・特殊役職） */
+const COMP_PAGES = [
+  { id: "white", label: "🤍 白陣営", teams: ["villager"] },
+  { id: "black", label: "🖤 黒陣営", teams: ["wolf"] },
+  { id: "third", label: "🟣 第三陣営・特殊役職", teams: ["fox", "special"] },
+];
+let compPage = "white";
+const compPageDef = () => COMP_PAGES.find((p) => p.id === compPage) || COMP_PAGES[0];
+const compKeysOfPage = (page) => ROLE_KEYS.filter((k) => page.teams.includes(ROLES[k].team));
+
 function renderCompEditor() {
   const cfg = room.config;
-  $("compEditor").innerHTML = ROLE_KEYS.map((k) => {
+  const page = compPageDef();
+  const pageKeys = compKeysOfPage(page);
+  const v = compVillagers();
+
+  /* タブの選択状態と、各ページに割り当てた人数を表示する */
+  document.querySelectorAll("[data-comp-page]").forEach((b) => {
+    const def = COMP_PAGES.find((p) => p.id === b.getAttribute("data-comp-page"));
+    if (!def) return;
+    const sum = compKeysOfPage(def).reduce((s, k) => s + (cfg.comp[k] || 0), 0) + (def.id === "white" ? Math.max(0, v) : 0);
+    b.textContent = def.label + "（" + sum + "）";
+    b.classList.toggle("active", def.id === page.id);
+  });
+  const pageIdx = COMP_PAGES.indexOf(page);
+  const info = $("compPageInfo");
+  if (info) info.textContent = (pageIdx + 1) + " / " + COMP_PAGES.length + " ページ";
+  const prev = $("compPrevBtn"), next = $("compNextBtn");
+  if (prev) prev.disabled = pageIdx <= 0;
+  if (next) next.disabled = pageIdx >= COMP_PAGES.length - 1;
+
+  const cardHtml = (k) => {
     const r = ROLES[k];
     const m = RG_META[k];
     return '<div class="comp-card">' +
@@ -348,13 +377,30 @@ function renderCompEditor() {
         '<span class="rg-chip">#' + m.tag + "</span>" +
         '<p class="rg-desc">' + r.desc + "</p>" +
       "</div></div>";
-  }).join("");
-  const v = compVillagers();
+  };
+  /* 村人は白陣営ページの先頭に「残りで自動」の固定カードとして出す（人数は自動計算） */
+  const villagerCard = page.id !== "white" ? "" : (() => {
+    const r = ROLES.villager;
+    const m = RG_META.villager;
+    return '<div class="comp-card">' +
+      '<div class="rg-bar" style="background:' + m.color + '"></div>' +
+      '<div class="rg-body">' +
+        '<div class="rg-head">' +
+          '<span class="rg-avatar sm" style="border-color:' + m.color + '">' + r.icon + "</span>" +
+          '<div><div class="rg-name">' + r.name + '</div>' +
+          '<div class="rg-teamlabel">' + TEAM_LABEL[r.team] + "</div></div>" +
+          '<span class="comp-ctl"><span class="num">' + Math.max(0, v) + '</span></span>' +
+        "</div>" +
+        '<span class="rg-chip">#残りで自動</span>' +
+        '<p class="rg-desc">' + r.desc + " 人数は他の役職を引いた残りで自動調整されます。</p>" +
+      "</div></div>";
+  })();
+  $("compEditor").innerHTML = villagerCard + pageKeys.map(cardHtml).join("");
   $("compSummary").textContent =
     "構成：" + ROLE_KEYS.map((k) => ROLES[k].name + (cfg.comp[k] || 0)).join("・") +
     "・村人" + v + "（合計" + cfg.target + "人）" +
     (v < 0 ? "　⚠ 役職が人数を超えています" : "");
-  $("compEditor").querySelectorAll("button").forEach((b) => {
+  $("compEditor").querySelectorAll("[data-comp]").forEach((b) => {
     b.addEventListener("click", async () => {
       const k = b.getAttribute("data-comp");
       const d = parseInt(b.getAttribute("data-d"), 10);
@@ -1496,6 +1542,23 @@ async function applyCompPreset(kind) {
 }
 $("recommendNormalBtn").addEventListener("click", () => applyCompPreset("normal"));
 $("recommendVarietyBtn").addEventListener("click", () => applyCompPreset("variety"));
+document.querySelectorAll("[data-comp-page]").forEach((b) => {
+  b.addEventListener("click", () => {
+    if (!room || !isHost()) return;
+    compPage = b.getAttribute("data-comp-page");
+    renderCompEditor();
+  });
+});
+$("compPrevBtn").addEventListener("click", () => {
+  if (!room || !isHost()) return;
+  const i = COMP_PAGES.indexOf(compPageDef());
+  if (i > 0) { compPage = COMP_PAGES[i - 1].id; renderCompEditor(); }
+});
+$("compNextBtn").addEventListener("click", () => {
+  if (!room || !isHost()) return;
+  const i = COMP_PAGES.indexOf(compPageDef());
+  if (i < COMP_PAGES.length - 1) { compPage = COMP_PAGES[i + 1].id; renderCompEditor(); }
+});
 $("lobbyChatSend").addEventListener("click", () => sendChat("lobbyChatInput"));
 $("chatSend").addEventListener("click", () => sendChat("chatInput"));
 $("lobbyChatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat("lobbyChatInput"); });
