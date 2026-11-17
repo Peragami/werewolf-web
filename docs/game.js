@@ -1241,15 +1241,204 @@ function hostBotsNight() {
   });
 }
 
+/* Botの昼の発言プラン（day -> {plans: {pid: {suspicion}}, publicBlack}）
+   発言と投票を一致させるためにホストが保持する */
+const botDayPlans = {};
+
+function botChatPost(pid, name, text, delay) {
+  const code = roomCode;
+  setTimeout(() => {
+    if (!code) return;
+    fb(subPath(code, "/chat.json"), "POST", { pid, name, text, ts: Date.now() }).catch(() => {});
+  }, delay);
+}
+
+/* チャットで誰かが「○○は黒」と言っていたら、その対象を返す（村人側Botの投票の参考） */
+function claimedBlackFromChat() {
+  const msgs = Object.values((room && room.chat) || {}).sort((a, b) => a.ts - b.ts);
+  let found = null;
+  msgs.forEach((m) => {
+    if (!m.text || !m.text.includes("黒")) return;
+    aliveArr().forEach((p) => {
+      if (p.pid !== m.pid && m.text.includes(p.name)) found = p.pid;
+    });
+  });
+  return found;
+}
+
 function hostBotsDaySkip() {
   const key = "d" + room.phaseSeq;
   if (botActedFor[key]) return;
   botActedFor[key] = true;
-  aliveArr().filter((p) => p.bot).forEach((p, i) => {
+  const code = roomCode;
+  const day = room.day;
+  const victims = (room.night && room.night.result && room.night.result.victims) || [];
+  const victimNames = victims.map((v) => v.name).join("、");
+  const bots = aliveArr().filter((p) => p.bot);
+  /* 情報を持つBot（占い師・霊媒師）を先に喋らせて、他のBotがその情報に反応できるようにする */
+  const order = { seer: 0, medium: 1, wolf: 2, wolf2: 2, fanatic: 3, madman: 4 };
+  bots.sort((a, b) => ((order[a.role] != null ? order[a.role] : 5) - (order[b.role] != null ? order[b.role] : 5)));
+  const plans = {};
+  let publicBlack = null; // {pid, name} 占い師BotがCOして黒を出した相手
+  const usedGreetings = new Set();
+  const pickGreeting = (arr) => {
+    const fresh = arr.filter((t) => !usedGreetings.has(t));
+    const t = pickRandom(fresh.length ? fresh : arr);
+    usedGreetings.add(t);
+    return t;
+  };
+
+  bots.forEach((p, idx) => {
+    const others = aliveArr().filter((t) => t.pid !== p.pid);
+    const nameOf = (pid) => (room.players[pid] ? room.players[pid].name : "");
+    const texts = [];
+    let suspicion = null;
+
+    /* --- 挨拶（＋昨夜の犠牲者への反応） --- */
+    if (victims.length) {
+      texts.push(pickGreeting([
+        "おはよう…。" + victimNames + "がやられちゃったんだね",
+        "おはよう。" + victimNames + "が犠牲になってたね…",
+        "おはようございます。" + victimNames + "、かわいそうに…",
+        "おはよう、みんな起きた？ " + victimNames + "がやられてた…",
+        "おはよう…。昨夜は" + victimNames + "が犠牲になったみたい",
+        "おはようございます。うそ、" + victimNames + "が…？",
+      ]));
+    } else {
+      texts.push(pickGreeting([
+        "おはよう！昨夜は犠牲者なしだったね",
+        "おはよう。誰も死んでなくてよかった",
+        "おはようございます、みんな無事だね",
+        "おはよう、みんな起きた？全員無事みたい",
+        "おはよう！平和な夜だったね",
+      ]));
+    }
+
+    /* --- 自分の持っている情報から話す --- */
+    if (p.role === "seer") {
+      const hist = ((room.seerHistory || {})[p.pid] || []);
+      const blacks = hist.filter((h) => h.result === "wolf" && room.players[h.target] && room.players[h.target].alive);
+      const thirds = hist.filter((h) => h.result === "third" && room.players[h.target] && room.players[h.target].alive);
+      const whites = hist.filter((h) => h.result === "human" && room.players[h.target] && room.players[h.target].alive);
+      if (blacks.length) {
+        const b = blacks[blacks.length - 1];
+        suspicion = b.target;
+        if (Math.random() < 0.85) {
+          texts.push("占い師COします。" + b.targetName + "を占ったら黒でした");
+          texts.push(b.targetName + "が怪しいです。今日は" + b.targetName + "に投票しようと思います");
+          publicBlack = { pid: b.target, name: b.targetName };
+        } else {
+          texts.push(b.targetName + "がすごく怪しいと思う…");
+        }
+      } else if (thirds.length) {
+        const t = thirds[thirds.length - 1];
+        suspicion = t.target;
+        texts.push("占い師COします。" + t.targetName + "は第三陣営って出たよ");
+      } else if (whites.length && Math.random() < 0.6) {
+        const w = whites[whites.length - 1];
+        texts.push(w.targetName + "は占いで白だったよ。たぶん大丈夫だと思う");
+        const cands = others.filter((t) => t.pid !== w.target);
+        if (cands.length && Math.random() < 0.5) {
+          suspicion = pickRandom(cands).pid;
+          texts.push(nameOf(suspicion) + "の方はちょっと気になるかな");
+        }
+      } else if (others.length) {
+        suspicion = pickRandom(others).pid;
+        texts.push(nameOf(suspicion) + "が少し気になる。まだ情報が少ないけど");
+      }
+    } else if (p.role === "medium") {
+      const mh = ((room.mediumHistory || {})[p.pid] || []);
+      if (mh.length) {
+        const m = mh[mh.length - 1];
+        const rn = ROLES[m.role] ? ROLES[m.role].name : m.role;
+        if (isWolfRole(m.role)) texts.push("霊媒COします。" + m.targetName + "は人狼だったよ！");
+        else texts.push("霊媒結果だよ。" + m.targetName + "は" + rn + "でした");
+      }
+      if (publicBlack) {
+        suspicion = publicBlack.pid;
+        texts.push("占いで黒が出た" + publicBlack.name + "が怪しいと思う");
+      } else if (others.length && Math.random() < 0.6) {
+        suspicion = pickRandom(others).pid;
+        texts.push(nameOf(suspicion) + "が少し怪しい気がする");
+      }
+    } else if (isWolfRole(p.role)) {
+      /* 人狼は村人のふりをして、人狼でない人を疑う。たまに仲間を白っぽく言う */
+      const nonWolves = others.filter((t) => !isWolfRole(t.role));
+      if (nonWolves.length) {
+        suspicion = pickRandom(nonWolves).pid;
+        texts.push(pickRandom([
+          nameOf(suspicion) + "がちょっと怪しい気がする",
+          nameOf(suspicion) + "、なんか様子が気になるんだよね",
+          "私は" + nameOf(suspicion) + "が怪しいと思うな",
+        ]));
+      }
+      const partners = others.filter((t) => isWolfRole(t.role));
+      if (partners.length && Math.random() < 0.3) {
+        texts.push(pickRandom(partners).name + "は白っぽいと思うけど");
+      }
+    } else if (p.role === "fanatic") {
+      /* 狂信者は人狼が分かるので、人狼でない人を疑い、たまに人狼をかばう */
+      const nonWolves = others.filter((t) => !isWolfRole(t.role));
+      if (nonWolves.length) {
+        suspicion = pickRandom(nonWolves).pid;
+        texts.push(nameOf(suspicion) + "が怪しいと思う");
+      }
+      const wolves = others.filter((t) => isWolfRole(t.role));
+      if (wolves.length && Math.random() < 0.4) texts.push(pickRandom(wolves).name + "は白っぽい気がする");
+    } else if (p.role === "madman") {
+      if (others.length) {
+        suspicion = pickRandom(others).pid;
+        texts.push(pickRandom([
+          nameOf(suspicion) + "が怪しいんじゃない？",
+          "なんとなく" + nameOf(suspicion) + "が気になるなぁ",
+        ]));
+      }
+    } else if (isThirdRole(p.role)) {
+      /* 第三・特殊陣営は目立たないように。半分くらいだけ軽く疑う */
+      if (publicBlack) {
+        suspicion = publicBlack.pid;
+        texts.push("黒が出た" + publicBlack.name + "は怪しいね");
+      } else if (others.length && Math.random() < 0.45) {
+        suspicion = pickRandom(others).pid;
+        texts.push(nameOf(suspicion) + "が少し気になるかも");
+      }
+    } else {
+      /* 村人陣営（村人・騎士・重騎士・シスター・大統領）：公開情報から */
+      if (publicBlack && Math.random() < 0.85) {
+        suspicion = publicBlack.pid;
+        texts.push(pickRandom([
+          "占いで黒って言われた" + publicBlack.name + "が怪しいと思う",
+          publicBlack.name + "が黒なら、今日は" + publicBlack.name + "に投票するつもり",
+        ]));
+      } else if (p.role === "knight" && !victims.length && Math.random() < 0.6) {
+        texts.push("犠牲者が出なかったのは、騎士の守りが成功したのかもね");
+        if (others.length && Math.random() < 0.5) {
+          suspicion = pickRandom(others).pid;
+          texts.push(nameOf(suspicion) + "が少し気になる");
+        }
+      } else if (others.length && Math.random() < 0.7) {
+        suspicion = pickRandom(others).pid;
+        texts.push(pickRandom([
+          nameOf(suspicion) + "が少し怪しいかも。理由はまだ弱いけど",
+          nameOf(suspicion) + "が気になるな。様子見してる感じがした",
+          "うーん、" + nameOf(suspicion) + "が怪しい気がする",
+        ]));
+      }
+    }
+
+    plans[p.pid] = { suspicion };
+    /* 発言をずらして流し、その後に議論終了（スキップ）を押す */
+    let delay = 1000 + idx * 1700 + Math.random() * 900;
+    texts.forEach((text) => {
+      botChatPost(p.pid, p.name, text, delay);
+      delay += 2300 + Math.random() * 1600;
+    });
+    const skipDelay = delay + 3000 + Math.random() * 5000;
     setTimeout(() => {
-      fb(subPath(roomCode, "/daySkip/" + p.pid + ".json"), "PUT", true).catch(() => {});
-    }, 1200 + i * 600);
+      fb(subPath(code, "/daySkip/" + p.pid + ".json"), "PUT", true).catch(() => {});
+    }, skipDelay);
   });
+  botDayPlans[day] = { plans, publicBlack };
 }
 
 function hostBotsVote() {
@@ -1265,7 +1454,20 @@ function hostBotsVote() {
       if (nonWolf.length) cands = nonWolf;
     }
     if (!cands.length) return;
-    const target = pickRandom(cands).pid;
+    /* 昼に自分が「怪しい」と言った相手に投票する（発言と投票を一致させる） */
+    let target = null;
+    const dayPlan = botDayPlans[room.day];
+    let planned = dayPlan && dayPlan.plans[p.pid] ? dayPlan.plans[p.pid].suspicion : null;
+    /* 村人側は、チャットで出た「黒」情報（人間の占いCO含む）も参考にする */
+    if (!isWolfTeam(p.role)) {
+      const claimed = claimedBlackFromChat();
+      if (claimed && claimed !== p.pid && Math.random() < 0.75) planned = claimed;
+    }
+    if (planned && planned !== p.pid && room.players[planned] && room.players[planned].alive &&
+        !(isWolfTeam(p.role) && isWolfRole(room.players[planned].role)) && Math.random() < 0.9) {
+      target = planned;
+    }
+    if (!target) target = pickRandom(cands).pid;
     setTimeout(() => {
       fb(subPath(roomCode, "/votes/" + p.pid + ".json"), "PUT", { target, ts: Date.now() }).catch(() => {});
     }, 1000 + i * 700 + Math.random() * 900);
