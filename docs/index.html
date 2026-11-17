@@ -33,7 +33,7 @@
         <button id="joinBtn">参加する</button>
       </div>
       <p id="homeError" class="error"></p>
-      <p class="note">友達とルームコードで集まって遊ぶオンライン人狼です。役職は各プレイヤーの端末にだけ表示されます。議論は対面や通話アプリでどうぞ。不足人数はBotで補充できます。</p>
+      <p class="note">友達とルームコードで集まって遊ぶオンライン人狼です。役職は各プレイヤーの端末にだけ表示されます。議論は対面や通話アプリでどうぞ。不足人数はBotで補充できます。<br>🐞 テスト用：ルームコードに <b>DEBUG</b> と打つと、役職の希望を設定できるデバッグルームに入れます。</p>
     </div>
   </section>
 
@@ -86,6 +86,14 @@
         <button id="startBtn" class="primary">ゲーム開始（役職を配る）</button>
       </div>
       <p id="lobbyWait" class="note hidden">ホストの開始を待っています…</p>
+      <div id="debugPanel" class="config hidden">
+        <h3>🐞 デバッグ設定（デバッグルーム）</h3>
+        <label>自分がなる役職
+          <select id="wantRoleSel"></select>
+        </label>
+        <p class="note">希望は役職構成より優先されます。同じ役職を何人でも希望できます（テスト用）。希望は参加者一覧にも表示されるので、テスター同士で調整できます。</p>
+        <button id="debugDeleteBtn" class="danger hidden">デバッグルームを初期化する（全員退出・ホストのみ）</button>
+      </div>
       <button id="leaveLobbyBtn" class="danger">ロビーを出る</button>
     </div>
     <div class="card">
@@ -101,6 +109,12 @@
   <!-- GAME -->
   <section id="screen-game" class="screen hidden">
     <div id="myRoleCard" class="card role-card"></div>
+    <div id="debugBarGame" class="card hidden">
+      <h3>🐞 デバッグルーム</h3>
+      <p class="note">テスト用に、全員の役職がプレイヤー一覧に表示されています。</p>
+      <button id="debugSkipBtn" class="hidden">⏩ フェイズを進める（ホスト）</button>
+      <button id="debugLobbyBtn" class="hidden">🐞 ロビーに戻す（ホスト）</button>
+    </div>
     <div id="phasePanel" class="card"></div>
     <div class="card">
       <h3>プレイヤー</h3>

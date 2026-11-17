@@ -321,7 +321,7 @@ button.selected {
 #screen-game .card { margin-bottom: 0; }
 #myRoleCard { grid-column: 1; }
 #phasePanel { grid-column: 2; }
-#screen-game > .card:nth-child(3) { grid-column: 1 / -1; } /* プレイヤー一覧は全幅 */
+#screen-game > .card:nth-child(4) { grid-column: 1 / -1; } /* プレイヤー一覧は全幅（2番目はデバッグバー） */
 #leaveGameBtn { grid-column: 1 / -1; justify-self: start; margin-top: 0; }
 
 @media (max-width: 900px) {

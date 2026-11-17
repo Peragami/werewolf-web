@@ -175,6 +175,7 @@ async function createRoom() {
 async function joinRoom() {
   if (!readName()) return;
   const code = $("joinCodeInput").value.trim().toUpperCase();
+  if (code === "DEBUG") { await joinDebugRoom(); return; }
   if (code.length !== 6) { $("homeError").textContent = "ルームコードは6文字です。"; return; }
   $("homeError").textContent = "";
   $("joinBtn").disabled = true;
@@ -192,6 +193,50 @@ async function joinRoom() {
     enterRoom(code);
   } catch (e) {
     $("homeError").textContent = "参加に失敗しました：通信を確認して再試行してください。";
+  } finally {
+    $("joinBtn").disabled = false;
+  }
+}
+
+/* ---------------- デバッグルーム（コード DEBUG で入る共有テスト部屋） ---------------- */
+const DEBUG_CODE = "DEBUG";
+async function joinDebugRoom() {
+  const code = DEBUG_CODE;
+  $("homeError").textContent = "";
+  $("joinBtn").disabled = true;
+  try {
+    const now = Date.now();
+    const data = await fb(roomPath(code), "GET");
+    const already = !!(data && data.players && data.players[myPid]);
+    if (already && data.status !== "finished") { enterRoom(code); return; }
+    const humans = data ? Object.values(data.players || {}).filter((p) => !p.bot) : [];
+    const lastHb = humans.reduce((m, p) => Math.max(m, p.hb || 0), 0);
+    /* 終了済み、または誰もいなくなって3分以上経った部屋は作り直す（テスターが詰まらないように） */
+    const stale = !!data && (data.status === "finished" || (humans.length > 0 && now - lastHb > 180000));
+    if (!data || stale) {
+      const fresh = {
+        v: 2, game: "werewolf", debug: true, status: "lobby", host: myPid, createdAt: now,
+        config: { target: 8, botFill: true, discussSec: 180, nightSec: 90, comp: { ...COMP_TABLE[8] } },
+        players: { [myPid]: { name: myName, bot: false, alive: true, role: null, wantRole: null, hb: now } },
+        day: 0, phaseSeq: 0, phaseEndsAt: 0,
+        log: [logEntry("🐞 デバッグルームが作成されました。ロビーで自分がなる役職の希望を設定できます。", "sys")],
+        winner: null, winReason: "",
+      };
+      await fb(roomPath(code), "PUT", fresh);
+      enterRoom(code);
+      return;
+    }
+    if (data.status !== "lobby") {
+      $("homeError").textContent = "デバッグルームは今ゲーム中です。ホストに「ロビーに戻す」か初期化を頼んでください。";
+      return;
+    }
+    const count = Object.keys(data.players || {}).length;
+    if (count >= 12) { $("homeError").textContent = "デバッグルームは満員です（12人まで）。"; return; }
+    await fb(subPath(code, "/players/" + myPid + ".json"), "PUT",
+      { name: myName, bot: false, alive: true, role: null, wantRole: null, hb: now });
+    enterRoom(code);
+  } catch (e) {
+    $("homeError").textContent = "デバッグルームへの参加に失敗しました：通信を確認して再試行してください。";
   } finally {
     $("joinBtn").disabled = false;
   }
@@ -301,12 +346,14 @@ function renderLobby() {
   $("memberList").innerHTML = arr.map((p) =>
     "<li><span>" + '<span class="avatar-sm">' + (p.bot ? "🤖" : "🧑") + "</span>" + esc(p.name) + (p.pid === myPid ? "（あなた）" : "") + "</span>" +
     "<span>" + (room.host === p.pid ? '<span class="tag host">ホスト</span>' : "") +
-    (p.bot ? '<span class="tag">Bot</span>' : "") + "</span></li>"
+    (p.bot ? '<span class="tag">Bot</span>' : "") +
+    (room.debug && p.wantRole && ROLES[p.wantRole] ? '<span class="tag">🐞希望：' + ROLES[p.wantRole].name + "</span>" : "") + "</span></li>"
   ).join("");
 
   const host = isHost();
   $("hostConfig").classList.toggle("hidden", !host);
   $("lobbyWait").classList.toggle("hidden", host);
+  renderDebugPanel();
   if (!host) return;
 
   const cfg = room.config;
@@ -321,6 +368,24 @@ function renderLobby() {
     $("nightSel").value = String(cfg.nightSec);
     renderCompEditor();
   }
+}
+
+let debugSig = "";
+function renderDebugPanel() {
+  const panel = $("debugPanel");
+  if (!panel) return;
+  panel.classList.toggle("hidden", !room.debug);
+  if (!room.debug) return;
+  $("debugDeleteBtn").classList.toggle("hidden", !isHost());
+  const my = me();
+  const sig = ((my && my.wantRole) || "") + "|" + isHost();
+  if (sig === debugSig) return;
+  debugSig = sig;
+  const sel = $("wantRoleSel");
+  sel.innerHTML = ['<option value="">ランダム（構成どおり）</option>']
+    .concat(["villager", ...ROLE_KEYS].map((k) =>
+      '<option value="' + k + '"' + (my && my.wantRole === k ? " selected" : "") + ">" + ROLES[k].icon + " " + ROLES[k].name + "</option>"))
+    .join("");
 }
 
 function compVillagers() {
@@ -474,12 +539,20 @@ function renderGame() {
 
   renderPhasePanel();
 
+  const dbgBar = $("debugBarGame");
+  if (dbgBar) {
+    dbgBar.classList.toggle("hidden", !room.debug);
+    $("debugSkipBtn").classList.toggle("hidden", !isHost());
+    $("debugLobbyBtn").classList.toggle("hidden", !isHost());
+  }
+
   const iKnowWolves = me() && (isWolfRole(me().role) || me().role === "fanatic");
   $("playerGrid").innerHTML = playersArr().map((p) => {
     let st = p.alive ? "生存" : "死亡";
     if (p.pid === room.host) st += "・ホスト";
     if (p.bot) st += "・Bot";
-    const roleMark = iKnowWolves && isWolfRole(p.role) ? ' <span class="tag">🐺人狼</span>' : "";
+    const roleMark = (iKnowWolves && isWolfRole(p.role) ? ' <span class="tag">🐺人狼</span>' : "") +
+      (room.debug && p.role && ROLES[p.role] ? ' <span class="tag">🐞' + ROLES[p.role].name + "</span>" : "");
     const avatar = p.alive ? (p.bot ? "🤖" : "🧑") : "💀";
     return '<div class="player-cell' + (p.alive ? "" : " dead") + (p.pid === myPid ? " me" : "") + '">' +
       '<div class="pc-head"><span class="avatar">' + avatar + '</span><span class="pc-name">' +
@@ -884,7 +957,7 @@ async function hostStartGame() {
 
   const newPlayers = {};
   humans.slice(0, N).forEach((p) => {
-    newPlayers[p.pid] = { name: p.name, bot: false, alive: true, role: null, hb: p.hb || Date.now() };
+    newPlayers[p.pid] = { name: p.name, bot: false, alive: true, role: null, wantRole: p.wantRole || null, hb: p.hb || Date.now() };
   });
   const usedNames = humans.map((p) => p.name);
   let bi = 0;
@@ -898,7 +971,28 @@ async function hostStartGame() {
   ROLE_KEYS.forEach((k) => { for (let i = 0; i < (comp[k] || 0); i++) deck.push(k); });
   for (let i = 0; i < villagerCount; i++) deck.push("villager");
   shuffle(deck);
-  Object.keys(newPlayers).forEach((pid, i) => { newPlayers[pid].role = deck[i]; });
+  /* デバッグルームの役職希望を構成より優先する（重複OK。希望が無い人は残りのデッキから） */
+  const remainingDeck = [...deck];
+  const assign = {};
+  Object.keys(newPlayers).forEach((pid) => {
+    const src = r.players[pid];
+    const want = r.debug && src && src.wantRole && ROLES[src.wantRole] ? src.wantRole : null;
+    if (!want) return;
+    assign[pid] = want;
+    let idx = remainingDeck.indexOf(want);
+    if (idx < 0) idx = remainingDeck.indexOf("villager");
+    if (idx < 0) idx = remainingDeck.findIndex((x) => !isWolfRole(x));
+    if (idx < 0) idx = remainingDeck.length - 1;
+    if (idx >= 0) remainingDeck.splice(idx, 1);
+  });
+  Object.keys(newPlayers).forEach((pid) => {
+    if (!assign[pid]) assign[pid] = remainingDeck.pop();
+    newPlayers[pid].role = assign[pid];
+  });
+  if (!Object.values(assign).some((x) => isWolfRole(x))) {
+    err("希望役職の結果、人狼が0人になりました。誰かが人狼を希望するか、構成に人狼を入れてください。");
+    return;
+  }
 
   const patch = {
     players: newPlayers, status: "reveal", day: 1, phaseSeq: r.phaseSeq + 1,
@@ -1214,7 +1308,7 @@ async function hostRematch() {
   const r = room;
   const newPlayers = {};
   playersArr().filter((p) => !p.bot).forEach((p) => {
-    newPlayers[p.pid] = { name: p.name, bot: false, alive: true, role: null, hb: p.hb || Date.now() };
+    newPlayers[p.pid] = { name: p.name, bot: false, alive: true, role: null, wantRole: p.wantRole || null, hb: p.hb || Date.now() };
   });
   const patch = {
     players: newPlayers, status: "lobby", day: 0, phaseSeq: r.phaseSeq + 1, phaseEndsAt: 0,
@@ -1559,6 +1653,23 @@ $("compNextBtn").addEventListener("click", () => {
   const i = COMP_PAGES.indexOf(compPageDef());
   if (i < COMP_PAGES.length - 1) { compPage = COMP_PAGES[i + 1].id; renderCompEditor(); }
 });
+$("wantRoleSel").addEventListener("change", async (e) => {
+  if (!room || !room.debug || !me()) return;
+  const v = e.target.value || null;
+  try {
+    await fb(subPath(roomCode, "/players/" + myPid + "/wantRole.json"), "PUT", v);
+    if (room.players[myPid]) room.players[myPid].wantRole = v;
+    debugSig = "";
+    renderLobby();
+  } catch (err) { /* 通信失敗時はpollで戻る */ }
+});
+$("debugDeleteBtn").addEventListener("click", () => { if (room && room.debug && isHost()) leaveRoom(true); });
+$("debugSkipBtn").addEventListener("click", async () => {
+  if (!room || !room.debug || !isHost()) return;
+  room.phaseEndsAt = Date.now();
+  try { await hostPatch({ phaseEndsAt: Date.now() }); } catch (e) {}
+});
+$("debugLobbyBtn").addEventListener("click", () => { if (room && room.debug && isHost()) hostRematch(); });
 $("lobbyChatSend").addEventListener("click", () => sendChat("lobbyChatInput"));
 $("chatSend").addEventListener("click", () => sendChat("chatInput"));
 $("lobbyChatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat("lobbyChatInput"); });
