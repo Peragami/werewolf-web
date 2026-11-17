@@ -299,6 +299,18 @@ button.selected {
 #revealList .player-cell { margin-bottom: 8px; }
 
 .vote-status { font-size: 13px; color: var(--sub); margin-top: 8px; line-height: 1.8; }
+
+/* ---------- 行動履歴（結果画面） ---------- */
+#screen-result > .card:nth-child(3) { grid-column: 1 / -1; }
+.action-log { max-height: 420px; }
+.action-log .al-head {
+  font-weight: 800; color: var(--gold); letter-spacing: .5px;
+  margin: 10px 0 4px; padding-bottom: 3px; border-bottom: 1px solid #39406b;
+}
+.action-log .al-head:first-child { margin-top: 0; }
+.action-log .al-line { border-bottom: 1px dashed #262c44; padding: 3px 0; }
+.action-log .al-line .who { color: var(--blue); font-weight: 700; }
+.action-log .al-sys { color: var(--gold); }
 .big-announce { font-size: 18px; font-weight: 800; line-height: 1.7; text-shadow: 0 1px 3px #000; }
 
 /* ---------- ワイドレイアウト（画面全体に広げてスクロールを減らす） ---------- */

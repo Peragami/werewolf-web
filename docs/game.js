@@ -161,6 +161,7 @@ async function createRoom() {
       players: { [myPid]: { name: myName, bot: false, alive: true, role: null, hb: Date.now() } },
       day: 0, phaseSeq: 0, phaseEndsAt: 0,
       log: [logEntry("ルームが作成されました。コードを友達に伝えてください。", "sys")],
+      actionLog: [],
       winner: null, winReason: "",
     };
     await fb(roomPath(code), "PUT", data);
@@ -220,6 +221,7 @@ async function joinDebugRoom() {
         players: { [myPid]: { name: myName, bot: false, alive: true, role: null, wantRole: null, hb: now } },
         day: 0, phaseSeq: 0, phaseEndsAt: 0,
         log: [logEntry("🐞 デバッグルームが作成されました。ロビーで自分がなる役職の希望を設定できます。", "sys")],
+        actionLog: [],
         winner: null, winReason: "",
       };
       await fb(roomPath(code), "PUT", fresh);
@@ -816,6 +818,28 @@ function renderResult() {
   $("rematchWait").classList.toggle("hidden", isHost());
   $("resultLog").innerHTML = (room.log || []).map((l) =>
     '<div class="' + esc(l.kind || "") + '">' + esc(l.text) + "</div>").join("");
+  renderActionLog();
+}
+
+function renderActionLog() {
+  const elx = $("actionLogView");
+  if (!elx) return;
+  const entries = (room && room.actionLog) || [];
+  if (!entries.length) {
+    elx.innerHTML = '<div class="log-line sys">この試合の行動履歴はありません。</div>';
+    return;
+  }
+  let html = "", lastKey = "";
+  entries.forEach((e) => {
+    const key = e.day + "-" + e.phase;
+    if (key !== lastKey) {
+      lastKey = key;
+      html += '<div class="al-head">' + e.day + "日目・" + (e.phase === "night" ? "🌙 夜" : "🗳️ 投票") + "</div>";
+    }
+    if (e.sys) html += '<div class="al-line al-sys">▶ ' + esc(e.text) + "</div>";
+    else html += '<div class="al-line"><span class="who">' + esc(e.name) + "（" + (ROLES[e.role] ? ROLES[e.role].name : e.role) + "）</span> " + esc(e.text) + "</div>";
+  });
+  elx.innerHTML = html;
 }
 
 /* ---------------- チャット ---------------- */
@@ -1001,6 +1025,7 @@ async function hostStartGame() {
     votes: {}, daySkip: {},
     seerHistory: {}, mediumHistory: {}, knightGuard: {}, voteResult: null,
     sisterUsed: {}, heavyState: {}, hinminActive: {}, uraUsed: {}, presidentBoost: {},
+    actionLog: [],
     log: [...(r.log || []), logEntry("ゲーム開始！" + N + "人（村人" + villagerCount + "人）に役職が配られました。", "sys")],
   };
   await hostPatch(patch);
@@ -1186,10 +1211,42 @@ async function resolveNight() {
   const aliveAfter = Object.entries(newPlayers).map(([pid, p]) => ({ pid, ...p })).filter((p) => p.alive);
   const winner = checkWinner(aliveAfter);
 
+  /* ---- 行動履歴（結果画面で公開する分を記録） ---- */
+  const nightEntries = [];
+  const nameT = (pid) => (P[pid] ? P[pid].name : "?");
+  Object.entries(actions).forEach(([pid, a]) => {
+    if (!a || !P[pid] || !P[pid].alive) return;
+    const role = P[pid].role;
+    const E = (text) => nightEntries.push({ day: r.day, phase: "night", pid, name: P[pid].name, role, text });
+    if (role === "wolf" && a.type === "attack" && a.target) E("襲撃に " + nameT(a.target) + " を選んだ");
+    else if (role === "wolf2" && a.type === "attack2") E("襲撃に " + (a.targets || []).map(nameT).join("、") + " を選んだ");
+    else if (role === "seer" && a.type === "divine" && a.target) E("占い：" + nameT(a.target) + " → " + divineText(divineResultOf(P[a.target].role)));
+    else if (role === "medium" && a.type === "medium" && a.target) E("霊媒：" + nameT(a.target) + " は " + (ROLES[P[a.target].role] ? ROLES[P[a.target].role].name : P[a.target].role));
+    else if (role === "knight" && a.type === "guard" && a.target) E("護衛：" + nameT(a.target));
+    else if (role === "heavyknight" && a.type === "guard2") E((a.targets && a.targets.length) ? "護衛：" + a.targets.map(nameT).join("、") : "今夜は守らなかった");
+    else if (role === "sister") E(a.type === "pray" ? "祈った（その夜は全員防御）" : "祈らなかった");
+    else if (role === "executioner" && a.type === "execute") E(a.target ? "処刑：" + nameT(a.target) : "処刑を見送った");
+    else if (role === "hinmin" && a.type === "hinminkill") E(a.target ? "人狼キル狙い：" + nameT(a.target) : "見送った");
+    else if (role === "urameshia" && a.type === "copy") {
+      if (!a.source || !a.target) E("能力コピーを見送った");
+      else {
+        const sr = P[a.source] ? P[a.source].role : null;
+        const srn = sr && ROLES[sr] ? ROLES[sr].name : sr;
+        if (sr === "seer") E("能力コピー（" + srn + "）占い：" + nameT(a.target) + " → " + divineText(divineResultOf(P[a.target].role)));
+        else if (sr === "knight" || sr === "heavyknight") E("能力コピー（" + srn + "）護衛：" + nameT(a.target));
+        else if (sr === "executioner") E("能力コピー（" + srn + "）処刑：" + nameT(a.target));
+        else if (isWolfRole(sr)) E("能力コピー（" + srn + "）襲撃：" + nameT(a.target));
+        else E("能力コピー（" + srn + "）：" + nameT(a.target));
+      }
+    }
+  });
+  nightEntries.push({ day: r.day, phase: "night", sys: true, text: victimObjs.length ? "犠牲者：" + victimObjs.map((v) => v.name).join("、") : "犠牲者はいなかった" });
+
   const patch = {
     players: newPlayers,
     night: { ...night, result: { victims: victimObjs, attackTargets }, seerTonight, mediumResult, copyResult },
     seerHistory, mediumHistory, knightGuard, sisterUsed, heavyState, uraUsed,
+    actionLog: [...(r.actionLog || []), ...nightEntries],
     phaseSeq: r.phaseSeq + 1,
   };
   if (winner) {
@@ -1276,11 +1333,21 @@ async function resolveVote() {
   } else {
     newLog.push(logEntry("⚖️ 投票の結果、票が割れて誰も追放されなかった。", "sys"));
   }
+  /* ---- 行動履歴：投票も記録 ---- */
+  const voteEntries = playersArr().filter((p) => p.alive).map((p) => {
+    const t = votes[p.pid] && votes[p.pid].target;
+    let text = t && P[t] ? "投票：" + P[t].name : "投票しなかった";
+    if (t && voteWeight(p.pid) === 3) text += "（3倍）";
+    return { day: r.day, phase: "vote", pid: p.pid, name: p.name, role: p.role, text };
+  });
+  voteEntries.push({ day: r.day, phase: "vote", sys: true, text: exiled ? "追放：" + P[exiled].name + "（" + (ROLES[P[exiled].role] ? ROLES[P[exiled].role].name : P[exiled].role) + "）" : "追放はなかった" });
+
   const patch = {
     players: newPlayers,
     voteResult: { exiled: exiled ? { pid: exiled, name: P[exiled].name } : null, counts },
     lastExiled: exiled || null,
     presidentBoost, hinminActive,
+    actionLog: [...(r.actionLog || []), ...voteEntries],
     status: "exile", phaseEndsAt: Date.now() + 8000,
     phaseSeq: r.phaseSeq + 1, log: newLog,
   };
@@ -1317,6 +1384,7 @@ async function hostRematch() {
     votes: {}, daySkip: {},
     seerHistory: {}, mediumHistory: {}, knightGuard: {},
     sisterUsed: {}, heavyState: {}, hinminActive: {}, uraUsed: {}, presidentBoost: {},
+    actionLog: [],
     log: [logEntry("再戦のためロビーに戻りました。", "sys")],
   };
   await hostPatch(patch);
