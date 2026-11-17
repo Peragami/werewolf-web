@@ -297,7 +297,52 @@ async function poll() {
     if (me() && !me().bot) {
       fb(subPath(roomCode, "/players/" + myPid + "/hb.json"), "PUT", Date.now()).catch(() => {});
     }
+    maybeTakeOverHost();
   } catch (e) { /* 一時的な通信失敗は次回ポーリングで回復 */ }
+}
+
+/* ---------------- ホスト引き継ぎ ----------------
+   ホストの心拍（hb）が止まったら、残っている参加者のうち決まった1人が
+   自動でホストを引き継いでゲームを続行する（ホストがタブを閉じた等） */
+const HOST_STALE_MS = 25000;   // この時間心拍がなければホスト不在とみなす
+const HOST_CONFIRM_MS = 6000;  // 不在を2回分のポーリングで確認してから引き継ぐ
+let staleHostKey = "";
+let staleHostSince = 0;
+let takeoverBusy = false;
+
+async function maybeTakeOverHost() {
+  if (!room || !roomCode || takeoverBusy) return;
+  const my = me();
+  if (!my || my.bot || room.host === myPid) return;
+  const now = Date.now();
+  const hostEntry = room.players ? room.players[room.host] : null;
+  const hostStale = !hostEntry || (now - (hostEntry.hb || 0) > HOST_STALE_MS);
+  if (!hostStale) { staleHostKey = ""; return; }
+  /* 一瞬の取得ズレで誤判定しないよう、不在が続いていることを確認する */
+  const key = room.host + ":" + (hostEntry ? hostEntry.hb || 0 : "gone");
+  if (key !== staleHostKey) { staleHostKey = key; staleHostSince = now; return; }
+  if (now - staleHostSince < HOST_CONFIRM_MS) return;
+  /* 引き継ぎ役は「心拍が新鮮な人間プレイヤーをID順に並べた先頭」で全端末一致させる */
+  const candidates = Object.entries(room.players || {})
+    .filter(([pid, p]) => !p.bot && pid !== room.host && now - (p.hb || 0) < HOST_STALE_MS + 5000)
+    .map(([pid]) => pid).sort();
+  if (!candidates.length || candidates[0] !== myPid) return;
+  takeoverBusy = true;
+  try {
+    /* 念のため最新を取り直して、ホストが復活していないか確認する */
+    const fresh = await fb(roomPath(roomCode), "GET");
+    if (!fresh || fresh.host === myPid) return;
+    const fh = fresh.players ? fresh.players[fresh.host] : null;
+    if (fh && Date.now() - (fh.hb || 0) <= HOST_STALE_MS) return;
+    await fb(roomPath(roomCode), "PATCH", { host: myPid });
+    room = { ...fresh, host: myPid };
+    staleHostKey = "";
+    const newLog = [...(fresh.log || []), logEntry("🔄 ホストの接続が切れたため、" + my.name + " がホストを引き継ぎました。", "sys")];
+    await hostPatch({ log: newLog });
+    room = { ...room, log: newLog };
+    render();
+  } catch (e) { /* 失敗したら次のポーリングで再判定 */ }
+  finally { takeoverBusy = false; }
 }
 
 function showScreen(name) {
@@ -1461,6 +1506,40 @@ function botChatPost(pid, name, text, delay) {
   }, delay);
 }
 
+/* チャットの占いCOを集める（発言順）。対抗COの判定やBotの反応に使う */
+function seerClaimersFromChat() {
+  const msgs = Object.values((room && room.chat) || {}).sort((a, b) => a.ts - b.ts);
+  const out = [];
+  const seen = new Set();
+  msgs.forEach((m) => {
+    if (!m.text || !m.text.includes("占い師CO") || seen.has(m.pid)) return;
+    if (!room.players[m.pid]) return;
+    seen.add(m.pid);
+    out.push({ pid: m.pid, name: m.name, ts: m.ts });
+  });
+  return out;
+}
+
+/* 霊媒結果と占い報告の矛盾を探す：
+   「○○は白」と言われていた人が、霊媒で「人狼だった」と出ていたら、その占いCOは偽物の疑い */
+function discreditedSeersFromChat() {
+  const msgs = Object.values((room && room.chat) || {}).sort((a, b) => a.ts - b.ts);
+  const wolfByMedium = new Set();
+  msgs.forEach((m) => {
+    if (!m.text || !m.text.includes("は人狼だった")) return;
+    Object.values(room.players || {}).forEach((p) => { if (m.text.includes(p.name + "は人狼だった")) wolfByMedium.add(p.name); });
+  });
+  if (!wolfByMedium.size) return [];
+  const bad = [];
+  msgs.forEach((m) => {
+    if (!m.text || !m.text.includes("は占いで白だった")) return;
+    Object.values(room.players || {}).forEach((p) => {
+      if (m.text.includes(p.name + "は占いで白だった") && wolfByMedium.has(p.name) && !bad.includes(m.pid)) bad.push(m.pid);
+    });
+  });
+  return bad;
+}
+
 /* チャットで誰かが「○○は黒」と言っていたら、その対象を返す（村人側Botの投票の参考） */
 function claimedBlackFromChat() {
   const msgs = Object.values((room && room.chat) || {}).sort((a, b) => a.ts - b.ts);
@@ -1488,6 +1567,10 @@ function hostBotsDaySkip() {
   bots.sort((a, b) => ((order[a.role] != null ? order[a.role] : 5) - (order[b.role] != null ? order[b.role] : 5)));
   const plans = {};
   let publicBlack = null; // {pid, name} 占い師BotがCOして黒を出した相手
+  let publicBlackBy = null; // そのCOをした占い師Botのpid
+  let counterClaim = null; // {pid, name} 対抗COしたBot（人狼・狂信者）
+  const discredited = discreditedSeersFromChat().filter((pid) =>
+    room.players[pid] && room.players[pid].alive); // 霊媒結果と矛盾した占いCO（偽物の疑い）
   const usedGreetings = new Set();
   const pickGreeting = (arr) => {
     const fresh = arr.filter((t) => !usedGreetings.has(t));
@@ -1524,6 +1607,13 @@ function hostBotsDaySkip() {
 
     /* --- 自分の持っている情報から話す --- */
     if (p.role === "seer") {
+      /* 過去に対抗COされていたら「自分が本物」と主張し直す */
+      const rivals = seerClaimersFromChat().filter((c) => c.pid !== p.pid && room.players[c.pid] && room.players[c.pid].alive);
+      const selfClaimed = seerClaimersFromChat().some((c) => c.pid === p.pid);
+      if (selfClaimed && rivals.length && Math.random() < 0.8) {
+        suspicion = rivals[rivals.length - 1].pid;
+        texts.push("私は本物の占い師です。対抗で出てきた" + rivals[rivals.length - 1].name + "は偽物だと思います");
+      }
       const hist = ((room.seerHistory || {})[p.pid] || []);
       const blacks = hist.filter((h) => h.result === "wolf" && room.players[h.target] && room.players[h.target].alive);
       const thirds = hist.filter((h) => h.result === "third" && room.players[h.target] && room.players[h.target].alive);
@@ -1535,6 +1625,7 @@ function hostBotsDaySkip() {
           texts.push("占い師COします。" + b.targetName + "を占ったら黒でした");
           texts.push(b.targetName + "が怪しいです。今日は" + b.targetName + "に投票しようと思います");
           publicBlack = { pid: b.target, name: b.targetName };
+          publicBlackBy = p.pid;
         } else {
           texts.push(b.targetName + "がすごく怪しいと思う…");
         }
@@ -1570,9 +1661,16 @@ function hostBotsDaySkip() {
         texts.push(nameOf(suspicion) + "が少し怪しい気がする");
       }
     } else if (isWolfRole(p.role)) {
+      /* 自分が占いで黒を出されたら、たまに対抗COして占い師のふりをする */
+      if (publicBlack && publicBlack.pid === p.pid && publicBlackBy && !counterClaim && Math.random() < 0.5) {
+        counterClaim = { pid: p.pid, name: p.name };
+        suspicion = publicBlackBy;
+        texts.push("ちょっと待って、占い師COします。私が本物の占い師です");
+        texts.push(nameOf(publicBlackBy) + "を占ったら黒でした。あっちが偽物です");
+      }
       /* 人狼は村人のふりをして、人狼でない人を疑う。たまに仲間を白っぽく言う */
       const nonWolves = others.filter((t) => !isWolfRole(t.role));
-      if (nonWolves.length) {
+      if (nonWolves.length && !(counterClaim && counterClaim.pid === p.pid)) {
         suspicion = pickRandom(nonWolves).pid;
         texts.push(pickRandom([
           nameOf(suspicion) + "がちょっと怪しい気がする",
@@ -1585,9 +1683,15 @@ function hostBotsDaySkip() {
         texts.push(pickRandom(partners).name + "は白っぽいと思うけど");
       }
     } else if (p.role === "fanatic") {
+      /* 仲間の人狼が黒を出されたら、たまに対抗COしてかばう */
+      if (publicBlack && publicBlackBy && isWolfRole(room.players[publicBlack.pid].role) && !counterClaim && Math.random() < 0.3) {
+        counterClaim = { pid: p.pid, name: p.name };
+        suspicion = publicBlackBy;
+        texts.push("占い師COします。私も本物の占い師で、" + nameOf(publicBlackBy) + "を占ったら黒でしたよ");
+      }
       /* 狂信者は人狼が分かるので、人狼でない人を疑い、たまに人狼をかばう */
       const nonWolves = others.filter((t) => !isWolfRole(t.role));
-      if (nonWolves.length) {
+      if (nonWolves.length && !(counterClaim && counterClaim.pid === p.pid)) {
         suspicion = pickRandom(nonWolves).pid;
         texts.push(nameOf(suspicion) + "が怪しいと思う");
       }
@@ -1612,7 +1716,19 @@ function hostBotsDaySkip() {
       }
     } else {
       /* 村人陣営（村人・騎士・重騎士・シスター・大統領）：公開情報から */
-      if (publicBlack && Math.random() < 0.85) {
+      const disc = discredited.filter((pid) => pid !== p.pid);
+      if (disc.length && Math.random() < 0.8) {
+        /* 霊媒結果と矛盾した占いCOは偽物の疑いが強い */
+        suspicion = disc[0];
+        texts.push("前に白って言ってた人の占い、霊媒結果と合ってないよね。" + nameOf(disc[0]) + "の占いは偽物じゃないかな");
+      } else if (counterClaim && Math.random() < 0.55) {
+        /* 対抗COが出たら、後から出てきた方を疑う */
+        suspicion = counterClaim.pid;
+        texts.push(pickRandom([
+          "占い師が2人出たね…後から出た" + counterClaim.name + "の方が怪しい気がする",
+          "対抗が出たか…。私は先に出た方を信じたいから、" + counterClaim.name + "が怪しいと思う",
+        ]));
+      } else if (publicBlack && Math.random() < 0.85) {
         suspicion = publicBlack.pid;
         texts.push(pickRandom([
           "占いで黒って言われた" + publicBlack.name + "が怪しいと思う",
@@ -1646,7 +1762,7 @@ function hostBotsDaySkip() {
       fb(subPath(code, "/daySkip/" + p.pid + ".json"), "PUT", true).catch(() => {});
     }, skipDelay);
   });
-  botDayPlans[day] = { plans, publicBlack };
+  botDayPlans[day] = { plans, publicBlack, counterClaim };
 }
 
 function hostBotsVote() {
@@ -1666,10 +1782,21 @@ function hostBotsVote() {
     let target = null;
     const dayPlan = botDayPlans[room.day];
     let planned = dayPlan && dayPlan.plans[p.pid] ? dayPlan.plans[p.pid].suspicion : null;
-    /* 村人側は、チャットで出た「黒」情報（人間の占いCO含む）も参考にする */
+    /* 村人側は、チャットの公開情報を精査して投票先を決める */
     if (!isWolfTeam(p.role)) {
-      const claimed = claimedBlackFromChat();
-      if (claimed && claimed !== p.pid && Math.random() < 0.75) planned = claimed;
+      const disc = discreditedSeersFromChat().filter((pid) => pid !== p.pid && room.players[pid] && room.players[pid].alive);
+      const claimers = seerClaimersFromChat().filter((c) => room.players[c.pid] && room.players[c.pid].alive);
+      if (disc.length && Math.random() < 0.8) {
+        /* 霊媒結果と矛盾した占いCOは偽物とみなす */
+        planned = disc[0];
+      } else if (claimers.length >= 2 && Math.random() < 0.65) {
+        /* 対抗CO同士なら、後から出てきた方を疑う */
+        const later = claimers[claimers.length - 1].pid;
+        if (later !== p.pid) planned = later;
+      } else {
+        const claimed = claimedBlackFromChat();
+        if (claimed && claimed !== p.pid && Math.random() < 0.75) planned = claimed;
+      }
     }
     if (planned && planned !== p.pid && room.players[planned] && room.players[planned].alive &&
         !(isWolfTeam(p.role) && isWolfRole(room.players[planned].role)) && Math.random() < 0.9) {
@@ -1704,6 +1831,61 @@ async function applyCompPreset(kind) {
 }
 $("recommendNormalBtn").addEventListener("click", () => applyCompPreset("normal"));
 $("recommendVarietyBtn").addEventListener("click", () => applyCompPreset("variety"));
+
+/* ---------------- マイ構成（カスタムプリセットを端末に保存） ---------------- */
+const CUSTOM_COMP_KEY = "wolf_custom_comps";
+function loadCustomComps() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_COMP_KEY) || "{}") || {}; }
+  catch (e) { return {}; }
+}
+function saveCustomComps(obj) {
+  try { localStorage.setItem(CUSTOM_COMP_KEY, JSON.stringify(obj)); } catch (e) {}
+}
+function refreshCompPresetSel() {
+  const sel = $("compPresetSel");
+  if (!sel) return;
+  const names = Object.keys(loadCustomComps()).sort();
+  sel.innerHTML = names.length
+    ? names.map((n) => '<option value="' + esc(n) + '">💾 ' + esc(n) + "</option>").join("")
+    : '<option value="">（保存した構成なし）</option>';
+}
+$("compSaveBtn").addEventListener("click", () => {
+  if (!room || !isHost()) return;
+  const name = $("compSaveName").value.trim();
+  if (!name) { $("compSaveMsg").textContent = "名前を入れてから保存してね。"; return; }
+  const all = loadCustomComps();
+  all[name] = { target: room.config.target, comp: { ...room.config.comp } };
+  saveCustomComps(all);
+  refreshCompPresetSel();
+  $("compPresetSel").value = name;
+  $("compSaveMsg").textContent = "「" + name + "」を保存しました（目標" + room.config.target + "人）。";
+});
+$("compLoadBtn").addEventListener("click", async () => {
+  if (!room || !isHost()) return;
+  const name = $("compPresetSel").value;
+  const saved = loadCustomComps()[name];
+  if (!saved) { $("compSaveMsg").textContent = "先に構成を保存してください。"; return; }
+  const comp = {};
+  ROLE_KEYS.forEach((k) => { comp[k] = Math.max(0, Math.min(4, saved.comp && saved.comp[k] ? saved.comp[k] : 0)); });
+  const target = Math.max(5, Math.min(12, saved.target || room.config.target));
+  try {
+    await fb(subPath(roomCode, "/config.json"), "PATCH", { comp, target });
+    room.config = { ...room.config, comp, target };
+    lobbySig = "";
+    renderLobby();
+    $("compSaveMsg").textContent = "「" + name + "」を読み込みました。";
+  } catch (e) { $("compSaveMsg").textContent = "読み込みに失敗しました。通信を確認してください。"; }
+});
+$("compDelBtn").addEventListener("click", () => {
+  const name = $("compPresetSel").value;
+  if (!name) return;
+  const all = loadCustomComps();
+  delete all[name];
+  saveCustomComps(all);
+  refreshCompPresetSel();
+  $("compSaveMsg").textContent = "「" + name + "」を削除しました。";
+});
+refreshCompPresetSel();
 document.querySelectorAll("[data-comp-page]").forEach((b) => {
   b.addEventListener("click", () => {
     if (!room || !isHost()) return;

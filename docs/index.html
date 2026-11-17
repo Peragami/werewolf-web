@@ -70,6 +70,14 @@
           <button id="recommendNormalBtn">✨ おすすめ構成（ノーマル）</button>
           <button id="recommendVarietyBtn">🎉 バラエティー構成（面白い役職多め）</button>
         </div>
+        <div class="preset-row custom-preset">
+          <input type="text" id="compSaveName" placeholder="マイ構成の名前" maxlength="20">
+          <button type="button" id="compSaveBtn">💾 今の構成を保存</button>
+          <select id="compPresetSel"></select>
+          <button type="button" id="compLoadBtn">読み込む</button>
+          <button type="button" id="compDelBtn">削除</button>
+        </div>
+        <p id="compSaveMsg" class="note"></p>
         <div class="comp-tabs">
           <button type="button" data-comp-page="white">🤍 白陣営</button>
           <button type="button" data-comp-page="black">🖤 黒陣営</button>

@@ -370,6 +370,13 @@ button.selected {
 
 .preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset-row button { flex: 1; min-width: 200px; margin-top: 6px; }
+.custom-preset { align-items: center; margin-top: 6px; }
+.custom-preset input[type="text"], .custom-preset select {
+  flex: 1; min-width: 140px; margin-top: 6px;
+  background: #12172b; color: var(--ink); border: 1px solid #39406b;
+  border-radius: 8px; padding: 9px 10px; font-size: 14px;
+}
+.custom-preset button { min-width: 110px; }
 
 /* ---------- 役職構成の3ページ切替 ---------- */
 .comp-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
